@@ -1,4 +1,4 @@
-module github.com/couchbase/moss
+module github.com/r-ef/moss
 
 go 1.25.4
 
