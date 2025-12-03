@@ -310,7 +310,7 @@ var DefaultCollectionOptions = CollectionOptions{
 	MergerIdleRunTimeoutMS:      0,
 	Debug:                       0,
 	Log:                         nil,
-	SegmentKeysIndexMaxBytes:    100,
+	SegmentKeysIndexMaxBytes:    0,
 	SegmentKeysIndexMinKeyBytes: 100000,
 }
 
