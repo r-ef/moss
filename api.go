@@ -310,8 +310,8 @@ var DefaultCollectionOptions = CollectionOptions{
 	MergerIdleRunTimeoutMS:      0,
 	Debug:                       0,
 	Log:                         nil,
-	SegmentKeysIndexMaxBytes:    0,
-	SegmentKeysIndexMinKeyBytes: 0,
+	SegmentKeysIndexMaxBytes:    1000,
+	SegmentKeysIndexMinKeyBytes: 100000,
 }
 
 // BatchOptions are provided to NewChildCollectionBatch().

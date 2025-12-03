@@ -793,23 +793,14 @@ func (a *segment) buildIndex(quota int, minKeyBytes int) {
 		return
 	}
 
-	scursor := &segmentCursor{
-		s:   a,
-		end: a.Len(),
-	}
-
-	for {
-		keyIdx, key := scursor.currentKey()
-		if key == nil {
+	// Directly sample keys at hop intervals for speed
+	for i := 0; i < sindex.numIndexableKeys; i++ {
+		pos := i * sindex.hop
+		if pos >= keyCount {
 			break
 		}
-
-		if !sindex.add(keyIdx, key) {
-			break // Out of space.
-		}
-
-		err := scursor.nextDelta(sindex.hop)
-		if err != nil {
+		_, key, _ := a.getOperationKeyVal(pos)
+		if !sindex.add(pos, key) {
 			break
 		}
 	}
