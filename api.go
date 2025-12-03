@@ -66,7 +66,6 @@
 // NOTE: the mossStore persistence design does not currently support
 // moving files created on one machine endian'ness type to another
 // machine with a different endian'ness type.
-//
 package moss
 
 import (
@@ -580,6 +579,7 @@ type CollectionStats struct {
 	TotMergerLowerLevelNotify     uint64
 	TotMergerLowerLevelNotifySkip uint64
 	TotMergerEmptyDirtyMid        uint64
+	TotMergerTombstoneDelay       uint64
 
 	TotMergerWaitIncomingBeg  uint64
 	TotMergerWaitIncomingStop uint64

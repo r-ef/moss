@@ -127,6 +127,17 @@ OUTER:
 		stackDirtyMidPrev.Close()
 
 		// ---------------------------------------------
+		// Check for high deletion ratio and delay merger if needed.
+
+		// r-ef addition
+
+		if m.shouldDelayMergerForTombstones(stackDirtyMid) {
+			atomic.AddUint64(&m.stats.TotMergerTombstoneDelay, 1)
+			time.Sleep(100 * time.Millisecond) // Brief delay to allow more writes
+			continue OUTER
+		}
+
+		// ---------------------------------------------
 		// Merge multiple stackDirtyMid layers.
 
 		startTime := time.Now()
@@ -165,6 +176,32 @@ OUTER:
 	// TODO: Dynamically calc'ed soft max dirty top height, for
 	// read-heavy (favor lower) versus write-heavy (favor higher)
 	// situations?
+}
+
+// r-ef addition
+// shouldDelayMergerForTombstones checks if the dirty segments have a high
+// ratio of deletion tombstones, and if so, delays merging to allow more
+// writes that might cancel out the deletions.
+func (m *collection) shouldDelayMergerForTombstones(stackDirtyMid *segmentStack) bool {
+	if stackDirtyMid == nil || stackDirtyMid.isEmpty() {
+		return false
+	}
+
+	var totalOps, totalDels uint64
+	for _, seg := range stackDirtyMid.a {
+		totalOps += uint64(seg.Len())
+		if s, ok := seg.(*segment); ok {
+			totalDels += s.totOperationDel
+		}
+	}
+
+	if totalOps == 0 {
+		return false
+	}
+
+	deletionRatio := float64(totalDels) / float64(totalOps)
+	// Delay if more than 60% deletions
+	return deletionRatio > 0.6
 }
 
 // ------------------------------------------------------

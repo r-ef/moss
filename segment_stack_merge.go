@@ -140,13 +140,42 @@ func (ss *segmentStack) mergeInto(minSegmentLevel, maxSegmentHeight int,
 		cancelCheckEvery = DefaultCollectionOptions.MergerCancelCheckEvery
 	}
 
-	iter, err := ss.startIterator(nil, nil, IteratorOptions{
-		IncludeDeletions: includeDeletions,
-		SkipLowerLevel:   true,
-		MinSegmentLevel:  minSegmentLevel,
-		MaxSegmentHeight: maxSegmentHeight,
-		base:             base,
-	})
+	// Optimization: if base is much larger than merging segments, use binary search
+	var useBaseBinarySearch bool
+	var baseSegment Segment
+	if base != nil && len(base.a) > 0 && minSegmentLevel == 0 && maxSegmentHeight > 1 {
+		baseLen := base.a[0].Len()
+		mergingLen := 0
+		for i := minSegmentLevel; i < maxSegmentHeight; i++ {
+			mergingLen += ss.a[i].Len()
+		}
+		// Use binary search if base is 5x larger and has >10k entries
+		if baseLen > 5*mergingLen && baseLen > 10000 {
+			useBaseBinarySearch = true
+			baseSegment = base.a[0]
+		}
+	}
+
+	var iter Iterator
+	var err error
+	if useBaseBinarySearch {
+		// Create iterator without the base layer (which we'll handle separately)
+		iter, err = ss.startIterator(nil, nil, IteratorOptions{
+			IncludeDeletions: includeDeletions,
+			SkipLowerLevel:   true,
+			MinSegmentLevel:  1, // Skip base layer
+			MaxSegmentHeight: maxSegmentHeight,
+			base:             nil, // Don't include base in iterator
+		})
+	} else {
+		iter, err = ss.startIterator(nil, nil, IteratorOptions{
+			IncludeDeletions: includeDeletions,
+			SkipLowerLevel:   true,
+			MinSegmentLevel:  minSegmentLevel,
+			MaxSegmentHeight: maxSegmentHeight,
+			base:             base,
+		})
+	}
 	if err != nil {
 		return err
 	}
@@ -174,11 +203,11 @@ OUTER:
 			return err
 		}
 
-		if optimizeTail && len(iter.cursors) == 1 {
+		if !useBaseBinarySearch && optimizeTail && len(iter.(*iterator).cursors) == 1 {
 			// When only 1 cursor remains, copy the remains of the
 			// last segment more directly instead of Next()'ing
 			// through the iterator.
-			cursor := iter.cursors[0]
+			cursor := iter.(*iterator).cursors[0]
 
 			var op uint64
 			var k, v []byte
@@ -214,6 +243,19 @@ OUTER:
 				op = OperationDel
 			} else {
 				op = OperationSet
+			}
+		}
+
+		// If using binary search for base layer, check if base has this key
+		if useBaseBinarySearch {
+			baseOp, baseVal, baseErr := baseSegment.Get(key)
+			if baseErr != nil {
+				return baseErr
+			}
+			if baseOp != 0 {
+				// Base layer has this key, use it instead
+				op = baseOp
+				val = baseVal
 			}
 		}
 
