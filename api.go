@@ -305,7 +305,7 @@ var DefaultCollectionOptions = CollectionOptions{
 	MergeOperator:               nil,
 	DeferredSort:                true,
 	MinMergePercentage:          0.5,
-	MaxPreMergerBatches:         1000,
+	MaxPreMergerBatches:         10,
 	MergerCancelCheckEvery:      1000000,
 	MergerIdleRunTimeoutMS:      0,
 	Debug:                       0,
