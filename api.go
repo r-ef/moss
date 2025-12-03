@@ -255,6 +255,15 @@ type CollectionOptions struct {
 	// ReadOnly means that persisted data and storage files if any,
 	// will remain unchanged.
 	ReadOnly bool
+
+	// SegmentKeysIndexMaxBytes is the maximum size in bytes allowed for
+	// the segmentKeysIndex. Also, an index will not be built if the
+	// segment's total key bytes is less than this parameter.
+	SegmentKeysIndexMaxBytes int
+
+	// SegmentKeysIndexMinKeyBytes is the minimum size in bytes that the
+	// keys of a segment must reach before a segment key index is built.
+	SegmentKeysIndexMinKeyBytes int
 }
 
 // Event represents the information provided in an OnEvent() callback.
@@ -293,13 +302,15 @@ var EventKindBatchExecute = EventKind(6)
 
 // DefaultCollectionOptions are the default configuration options.
 var DefaultCollectionOptions = CollectionOptions{
-	MergeOperator:          nil,
-	MinMergePercentage:     0.8,
-	MaxPreMergerBatches:    10,
-	MergerCancelCheckEvery: 10000,
-	MergerIdleRunTimeoutMS: 0,
-	Debug:                  0,
-	Log:                    nil,
+	MergeOperator:               nil,
+	MinMergePercentage:          0.5,
+	MaxPreMergerBatches:         20,
+	MergerCancelCheckEvery:      50000,
+	MergerIdleRunTimeoutMS:      100,
+	Debug:                       0,
+	Log:                         nil,
+	SegmentKeysIndexMaxBytes:    100000,
+	SegmentKeysIndexMinKeyBytes: 100000,
 }
 
 // BatchOptions are provided to NewChildCollectionBatch().

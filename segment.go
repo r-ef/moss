@@ -896,6 +896,18 @@ func (b *batch) doSort() {
 	}
 }
 
+func (b *batch) buildIndexRecursive(maxBytes, minKeyBytes int) {
+	if b == deletedChildBatchMarker {
+		return
+	}
+
+	b.segment.buildIndex(maxBytes, minKeyBytes)
+
+	for _, childBatch := range b.childBatches {
+		childBatch.buildIndexRecursive(maxBytes, minKeyBytes)
+	}
+}
+
 func (b *batch) isEmpty() bool {
 	if len(b.childBatches) != 0 {
 		// Presence of child batches indicates a non-empty batch even
