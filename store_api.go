@@ -134,7 +134,7 @@ var DefaultStoreOptions = StoreOptions{
 	CompactionLevelMultiplier:   9,
 	CompactionBufferPages:       512,
 	CompactionSyncAfterBytes:    16000000,
-	SegmentKeysIndexMaxBytes:    100000,
+	SegmentKeysIndexMaxBytes:    10000,
 	SegmentKeysIndexMinKeyBytes: 10000000,
 }
 

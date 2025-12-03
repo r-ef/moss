@@ -41,14 +41,21 @@ func TestSegmentKeysIndex(t *testing.T) {
 		6,  // average key size
 	)
 
+	data := []byte("key1key1000key500")
+	s.buf = data
+
+	offset := 0
 	for i, k := range keys {
-		ret := s.add(i, []byte(k))
+		ret := s.add(i, uint32(offset), uint32(len(k)))
+		if ret && i%s.hop == 0 {
+			offset += len(k)
+		}
 		if !ret {
 			t.Errorf("Unexpected Add failure!")
 		}
 	}
 
-	ret := s.add(0, []byte("key"))
+	ret := s.add(0, 0, uint32(len("key")))
 	if ret {
 		t.Errorf("Space shouldn't have been available!")
 	}
@@ -57,14 +64,12 @@ func TestSegmentKeysIndex(t *testing.T) {
 		t.Errorf("Unexpected number of keys (%v) indexed!", s.numIndexableKeys)
 	}
 
-	data := []byte("key1key1000key500")
-
-	if !bytes.Contains(s.data, data) {
-		t.Errorf("Unexpected data in index array: %v", string(s.data))
+	if !bytes.Contains(s.buf, data) {
+		t.Errorf("Unexpected data in index array: %v", string(s.buf))
 	}
 
 	if s.numKeys != 3 ||
-		s.offsets[0] != 0 || s.offsets[1] != 4 || s.offsets[2] != 11 {
+		s.keyOffsets[0] != 0 || s.keyOffsets[1] != 4 || s.keyOffsets[2] != 11 {
 		t.Errorf("Unexpected content in offsets array!")
 	}
 

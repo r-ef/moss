@@ -582,3 +582,71 @@ func TestIteratorSingleDone(t *testing.T) {
 		}
 	}
 }
+
+func TestIteratorPrefix(t *testing.T) {
+	m, err := NewCollection(CollectionOptions{})
+	if err != nil || m == nil {
+		t.Errorf("expected moss")
+	}
+	m.Start()
+
+	// Insert keys with common prefix "aa" in multiple batches
+	batch, _ := m.NewBatch(0, 0)
+	batch.Set([]byte("aaa"), []byte("1"))
+	m.ExecuteBatch(batch, WriteOptions{})
+	batch.Close()
+
+	batch, _ = m.NewBatch(0, 0)
+	batch.Set([]byte("aab"), []byte("2"))
+	m.ExecuteBatch(batch, WriteOptions{})
+	batch.Close()
+
+	batch, _ = m.NewBatch(0, 0)
+	batch.Set([]byte("aac"), []byte("3"))
+	m.ExecuteBatch(batch, WriteOptions{})
+	batch.Close()
+
+	ss, err := m.Snapshot()
+	if err != nil {
+		t.Errorf("expected ss ok")
+	}
+
+	// Iterator with start "aa", end "ab", should iterate "aaa", "aab", "aac"
+	iter, err := ss.StartIterator([]byte("aa"), []byte("ab"), IteratorOptions{})
+	if err != nil || iter == nil {
+		t.Errorf("expected iter")
+	}
+
+	expected := []string{"aaa", "aab", "aac"}
+	i := 0
+	for {
+		k, v, err := iter.Current()
+		if err == ErrIteratorDone {
+			break
+		}
+		if err != nil {
+			t.Errorf("expected no err, got: %v", err)
+		}
+		if i >= len(expected) {
+			t.Errorf("too many keys")
+		}
+		if string(k) != expected[i] {
+			t.Errorf("expected %s, got %s", expected[i], string(k))
+		}
+		if string(v) != fmt.Sprintf("%d", i+1) {
+			t.Errorf("expected %d, got %s", i+1, string(v))
+		}
+		err = iter.Next()
+		if err != nil && err != ErrIteratorDone {
+			t.Errorf("expected no err, got: %v", err)
+		}
+		i++
+	}
+	if i != len(expected) {
+		t.Errorf("expected %d keys, got %d", len(expected), i)
+	}
+
+	iter.Close()
+	ss.Close()
+	m.Close()
+}
