@@ -19,43 +19,42 @@ type segmentKeysIndex struct {
 	// Keys that have been added so far.
 	numKeys int
 
-	// Size in bytes of all the indexed keys.
-	numKeyBytes int
+	// Start offsets of keys in the segment's buf.
+	keyOffsets []uint32
 
-	// In-memory byte array of keys.
-	data []byte
-
-	// Start offsets of keys in the data array.
-	offsets []uint32
+	// Lengths of keys.
+	keyLengths []uint32
 
 	// Number of skips over keys in the segment kvs to arrive at the
-	// next adjacent key in the data array.
+	// next adjacent key in the keyOffsets array.
 	hop int
 
 	// Total number of keys in the source segment.
 	srcKeyCount int
+
+	// Reference to segment buf for key access.
+	buf []byte
 }
 
-// newSegmentKeysIndex preallocates the data/offsets arrays
+// newSegmentKeysIndex preallocates the keyOffsets array
 // based on a calculated hop.
 func newSegmentKeysIndex(quota int, srcKeyCount int,
 	keyAvgSize int) *segmentKeysIndex {
-	numIndexableKeys := quota / (keyAvgSize + 4 /* 4 for the offset */)
+	numIndexableKeys := quota / 8 /* 4 for offset + 4 for length */
 	if numIndexableKeys == 0 {
 		return nil
 	}
 
 	hop := (srcKeyCount / numIndexableKeys) + 1
 
-	data := make([]byte, numIndexableKeys*keyAvgSize)
-	offsets := make([]uint32, numIndexableKeys)
+	keyOffsets := make([]uint32, numIndexableKeys)
+	keyLengths := make([]uint32, numIndexableKeys)
 
 	return &segmentKeysIndex{
 		numIndexableKeys: numIndexableKeys,
 		numKeys:          0,
-		numKeyBytes:      0,
-		data:             data,
-		offsets:          offsets,
+		keyOffsets:       keyOffsets,
+		keyLengths:       keyLengths,
 		hop:              hop,
 		srcKeyCount:      srcKeyCount,
 	}
@@ -63,16 +62,11 @@ func newSegmentKeysIndex(quota int, srcKeyCount int,
 
 // Adds a qualified entry to the index. Returns true if space
 // still available, false otherwise.
-func (s *segmentKeysIndex) add(keyIdx int, key []byte) bool {
+func (s *segmentKeysIndex) add(keyIdx int, keyOffset uint32) bool {
 	if s.numKeys >= s.numIndexableKeys {
 		// All keys that can be indexed already have been,
 		// return false indicating that there's no room for
 		// anymore.
-		return false
-	}
-
-	if len(key) > (len(s.data) - s.numKeyBytes) {
-		// No room for any more keys.
 		return false
 	}
 
@@ -81,10 +75,8 @@ func (s *segmentKeysIndex) add(keyIdx int, key []byte) bool {
 		return true
 	}
 
-	s.offsets[s.numKeys] = uint32(s.numKeyBytes)
-	copy(s.data[s.numKeyBytes:], key)
+	s.keyOffsets[s.numKeys] = keyOffset
 	s.numKeys++
-	s.numKeyBytes += len(key)
 
 	return true
 }
@@ -103,9 +95,10 @@ func (s *segmentKeysIndex) lookup(key []byte) (leftPos int, rightPos int) {
 	}
 
 	// If key smaller than the first key, return early.
-	keyStart := s.offsets[0]
-	keyEnd := s.offsets[1]
-	cmp := bytes.Compare(key, s.data[keyStart:keyEnd])
+	keyStart := s.keyOffsets[0]
+	keyLen := s.keyLengths[0]
+	indexedKey := s.buf[keyStart : keyStart+keyLen]
+	cmp := bytes.Compare(key, indexedKey)
 	if cmp < 0 {
 		return
 	}
@@ -113,9 +106,10 @@ func (s *segmentKeysIndex) lookup(key []byte) (leftPos int, rightPos int) {
 	indexOfLastKey := s.numKeys - 1
 
 	// If key larger than last key, return early.
-	keyStart = s.offsets[indexOfLastKey]
-	keyEnd = uint32(s.numKeyBytes)
-	cmp = bytes.Compare(s.data[keyStart:keyEnd], key)
+	keyStart = s.keyOffsets[indexOfLastKey]
+	keyLen = s.keyLengths[indexOfLastKey]
+	indexedKey = s.buf[keyStart : keyStart+keyLen]
+	cmp = bytes.Compare(indexedKey, key)
 	if cmp < 0 {
 		leftPos = (indexOfLastKey) * s.hop
 		rightPos = s.srcKeyCount
@@ -125,14 +119,11 @@ func (s *segmentKeysIndex) lookup(key []byte) (leftPos int, rightPos int) {
 	for i < j {
 		h := i + (j-i)/2
 
-		keyStart = s.offsets[h]
-		if h < indexOfLastKey {
-			keyEnd = s.offsets[h+1]
-		} else {
-			keyEnd = uint32(s.numKeyBytes)
-		}
+		keyStart = s.keyOffsets[h]
+		keyLen = s.keyLengths[h]
+		indexedKey = s.buf[keyStart : keyStart+keyLen]
 
-		cmp = bytes.Compare(s.data[keyStart:keyEnd], key)
+		cmp = bytes.Compare(indexedKey, key)
 		if cmp == 0 {
 			leftPos = h * s.hop
 			rightPos = leftPos + 1
@@ -147,8 +138,7 @@ func (s *segmentKeysIndex) lookup(key []byte) (leftPos int, rightPos int) {
 		}
 	}
 
+	// The key is between i and j.
 	leftPos = i * s.hop
 	rightPos = j * s.hop
-
-	return
 }

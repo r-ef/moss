@@ -792,6 +792,7 @@ func (a *segment) buildIndex(quota int, minKeyBytes int) {
 	if sindex == nil {
 		return
 	}
+	sindex.buf = a.buf
 
 	// Directly sample keys at hop intervals for speed
 	for i := 0; i < sindex.numIndexableKeys; i++ {
@@ -799,8 +800,10 @@ func (a *segment) buildIndex(quota int, minKeyBytes int) {
 		if pos >= keyCount {
 			break
 		}
-		_, key, _ := a.getOperationKeyVal(pos)
-		if !sindex.add(pos, key) {
+		offset := a.kvs[pos*2+1]
+		operation, _, _ := a.getOperationKeyVal(pos)
+		keyLen := (operation >> 32) & maskKeyLength >> 32 // extract key length
+		if !sindex.add(pos, uint32(offset), uint32(keyLen)) {
 			break
 		}
 	}
