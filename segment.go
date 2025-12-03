@@ -802,8 +802,8 @@ func (a *segment) buildIndex(quota int, minKeyBytes int) {
 		}
 		offset := a.kvs[pos*2+1]
 		operation, _, _ := a.getOperationKeyVal(pos)
-		keyLen := (operation >> 32) & maskKeyLength >> 32 // extract key length
-		if !sindex.add(pos, uint32(offset), uint32(keyLen)) {
+		keyLen := uint32((operation & maskKeyLength) >> 32) // extract key length
+		if !sindex.add(pos, uint32(offset), keyLen) {
 			break
 		}
 	}

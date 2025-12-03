@@ -62,7 +62,7 @@ func newSegmentKeysIndex(quota int, srcKeyCount int,
 
 // Adds a qualified entry to the index. Returns true if space
 // still available, false otherwise.
-func (s *segmentKeysIndex) add(keyIdx int, keyOffset uint32) bool {
+func (s *segmentKeysIndex) add(keyIdx int, keyOffset uint32, keyLen uint32) bool {
 	if s.numKeys >= s.numIndexableKeys {
 		// All keys that can be indexed already have been,
 		// return false indicating that there's no room for
@@ -76,6 +76,7 @@ func (s *segmentKeysIndex) add(keyIdx int, keyOffset uint32) bool {
 	}
 
 	s.keyOffsets[s.numKeys] = keyOffset
+	s.keyLengths[s.numKeys] = keyLen
 	s.numKeys++
 
 	return true
@@ -141,4 +142,5 @@ func (s *segmentKeysIndex) lookup(key []byte) (leftPos int, rightPos int) {
 	// The key is between i and j.
 	leftPos = i * s.hop
 	rightPos = j * s.hop
+	return
 }
