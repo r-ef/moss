@@ -303,14 +303,15 @@ var EventKindBatchExecute = EventKind(6)
 // DefaultCollectionOptions are the default configuration options.
 var DefaultCollectionOptions = CollectionOptions{
 	MergeOperator:               nil,
+	DeferredSort:                true,
 	MinMergePercentage:          0.5,
-	MaxPreMergerBatches:         20,
-	MergerCancelCheckEvery:      50000,
-	MergerIdleRunTimeoutMS:      100,
+	MaxPreMergerBatches:         1000,
+	MergerCancelCheckEvery:      1000000,
+	MergerIdleRunTimeoutMS:      0,
 	Debug:                       0,
 	Log:                         nil,
-	SegmentKeysIndexMaxBytes:    100000,
-	SegmentKeysIndexMinKeyBytes: 100000,
+	SegmentKeysIndexMaxBytes:    0,
+	SegmentKeysIndexMinKeyBytes: 0,
 }
 
 // BatchOptions are provided to NewChildCollectionBatch().

@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"fmt"
 	"slices"
+	"sync"
 	"unsafe"
 )
 
@@ -132,6 +133,8 @@ type segment struct {
 
 	// In-memory index, immutable after segment initialization.
 	index *segmentKeysIndex
+
+	sorted bool
 }
 
 // See the OperationXxx consts.
@@ -150,17 +153,37 @@ const maxValLength = 1<<28 - 1
 const maskRESERVED = uint64(0xF0000000F0000000)
 
 // newSegment() allocates a segment with hinted amount of resources.
+var segmentPool = sync.Pool{
+	New: func() interface{} {
+		return &segment{}
+	},
+}
+
 func newSegment(totalOps, totalKeyValBytes int) (*segment, error) {
-	return &segment{
-		kvs: make([]uint64, 0, totalOps*2),
-		buf: make([]byte, 0, totalKeyValBytes),
-	}, nil
+	a := segmentPool.Get().(*segment)
+	a.kvs = make([]uint64, 0, totalOps*2)
+	a.buf = make([]byte, 0, totalKeyValBytes)
+	a.index = nil
+	a.sorted = false
+	a.totOperationSet = 0
+	a.totOperationDel = 0
+	a.totOperationMerge = 0
+	a.totKeyByte = 0
+	a.totValByte = 0
+	a.needSorterCh = nil
+	a.waitSortedCh = nil
+	a.rootCollection = nil
+	return a, nil
 }
 
 func (a *segment) Kind() string { return SegmentKindBasic }
 
 // Close releases resources associated with the segment.
 func (a *segment) Close() error {
+	a.kvs = nil
+	a.buf = nil
+	a.index = nil
+	segmentPool.Put(a)
 	return nil
 }
 
@@ -582,9 +605,7 @@ func (a *segment) doSort() {
 		return bytes.Compare(kx, ky)
 	})
 
-	if !SkipStats {
-		go a.rootCollection.updateStats(a)
-	}
+	a.sorted = true
 }
 
 // SkipStats allows advanced applications that don't care about
