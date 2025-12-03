@@ -303,7 +303,7 @@ var EventKindBatchExecute = EventKind(6)
 // DefaultCollectionOptions are the default configuration options.
 var DefaultCollectionOptions = CollectionOptions{
 	MergeOperator:               nil,
-	DeferredSort:                true,
+	DeferredSort:                false,
 	MinMergePercentage:          0.5,
 	MaxPreMergerBatches:         10,
 	MergerCancelCheckEvery:      1000000,
